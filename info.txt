@@ -1,0 +1,18 @@
+
+Hope you enjoy your new logo, here are the people that
+made your beautiful logo happen :)
+font name: Coda-Regular
+font link: https://fonts.google.com/specimen/Coda
+font author: Vernon Adams
+font author site: http://sansoxygen.com/
+
+
+icon designer: Ruben Vh
+icon designer link: /Ruben_Vh
+        
+
+fontColor: {"hex":"#B07b12"}
+bgColor: {"hex":"#3b4252"}
+iconColor: {"hex":"#B07b12"}
+
+      
