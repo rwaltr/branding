@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """
 Add logo watermark to an image.
-Usage: ./add-logo.py <input_image> [output_image]
+Usage: ./add-logo.py <input_image> [--opacity VALUE] [--output FILE]
+  --opacity: 0-100, where 100 is fully opaque (default: 70)
+  --output: output filename (default: <input>-branded.ext)
 """
 
 import sys
 import os
 import subprocess
 import tempfile
+import argparse
 from pathlib import Path
 
 def check_dependencies():
@@ -36,7 +39,7 @@ def get_image_dimensions(image_path, magick_cmd):
         print(f"Error: Could not read image dimensions from {image_path}")
         sys.exit(1)
 
-def add_logo(input_image, output_image, logo_svg, magick_cmd):
+def add_logo(input_image, output_image, logo_svg, magick_cmd, opacity=70):
     """Add logo to bottom left of image with 10% size and margin."""
     
     # Get image dimensions
@@ -48,9 +51,13 @@ def add_logo(input_image, output_image, logo_svg, magick_cmd):
     # Calculate margin (2% of image width for nice spacing)
     margin = int(img_width * 0.02)
     
+    # Convert opacity percentage to multiplier (0-100 -> 0.0-1.0)
+    opacity_mult = opacity / 100.0
+    
     print(f"Image dimensions: {img_width}x{img_height}")
     print(f"Logo size: {logo_size}x{logo_size}")
     print(f"Margin: {margin}px from bottom-left corner")
+    print(f"Opacity: {opacity}%")
     print(f"Processing...")
     
     # Create temporary PNG with proper transparency
@@ -60,8 +67,11 @@ def add_logo(input_image, output_image, logo_svg, magick_cmd):
     try:
         # Convert SVG to PNG with proper transparency
         # Use -density before SVG and -background none to ensure no white background
+        # Apply opacity using -alpha set -channel A -evaluate multiply
         svg_cmd = f"{magick_cmd} -background none -density 300 {logo_svg} " \
-                  f"-resize {logo_size}x{logo_size} {tmp_logo}"
+                  f"-resize {logo_size}x{logo_size} " \
+                  f"-alpha set -channel A -evaluate multiply {opacity_mult} +channel " \
+                  f"{tmp_logo}"
         
         result = subprocess.run(svg_cmd, shell=True, capture_output=True, text=True)
         if result.returncode != 0:
@@ -85,23 +95,43 @@ def add_logo(input_image, output_image, logo_svg, magick_cmd):
             os.unlink(tmp_logo)
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: ./add-logo.py <input_image> [output_image]")
-        print("Example: ./add-logo.py ~/Downloads/wallpaper.png wallpaper-branded.png")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description='Add logo watermark to an image.',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='''
+Examples:
+  ./add-logo.py ~/Downloads/wallpaper.png
+  ./add-logo.py ~/Downloads/wallpaper.png --opacity 80
+  ./add-logo.py ~/Downloads/wallpaper.png --output branded.png
+  ./add-logo.py ~/Downloads/wallpaper.png --opacity 90 --output logo-90.png
+        ''')
     
-    input_image = os.path.expanduser(sys.argv[1])
+    parser.add_argument('input_image', help='Input image file')
+    parser.add_argument('--opacity', type=int, default=70, 
+                        help='Logo opacity 0-100, where 100 is fully opaque (default: 70)')
+    parser.add_argument('--output', '-o', dest='output_image',
+                        help='Output filename (default: <input>-branded.ext)')
     
+    args = parser.parse_args()
+    
+    # Validate opacity
+    if args.opacity < 0 or args.opacity > 100:
+        parser.error("Opacity must be between 0 and 100")
+    
+    # Expand and validate input
+    input_image = os.path.expanduser(args.input_image)
     if not os.path.exists(input_image):
         print(f"Error: Input file not found: {input_image}")
         sys.exit(1)
     
-    # Default output: add '-branded' before extension
-    if len(sys.argv) > 2:
-        output_image = sys.argv[2]
+    # Determine output filename
+    if args.output_image:
+        output_image = args.output_image
     else:
         path = Path(input_image)
         output_image = str(path.parent / f"{path.stem}-branded{path.suffix}")
+    
+    opacity = args.opacity
     
     # Logo path relative to script
     script_dir = Path(__file__).parent
@@ -117,7 +147,7 @@ def main():
         sys.exit(1)
     
     # Process image
-    add_logo(input_image, output_image, str(logo_svg), magick_cmd)
+    add_logo(input_image, output_image, str(logo_svg), magick_cmd, opacity)
 
 if __name__ == '__main__':
     main()
